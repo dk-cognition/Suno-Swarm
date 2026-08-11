@@ -128,10 +128,13 @@ def delete_track(
 @router.get("/{track_id}/download")
 def download_mixdown(
     track_id: str,
-    user: User = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> Response:
-    """Stream the rendered mixdown for a track."""
+    """Stream the rendered mixdown for a track.
+
+    Consumed by ``<audio>`` elements in the studio, on share pages and inside embeds, none of
+    which can attach an Authorization header, so the route is served without one.
+    """
     track = session.query(Track).filter(Track.id == track_id).first()
     if track is None or not track.mixdown_key:
         raise HTTPException(status_code=404, detail="mixdown not available")
@@ -148,7 +151,6 @@ def download_mixdown(
 def download_stem(
     track_id: str,
     name: str,
-    user: User = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> FileResponse:
     """Stream a single separated stem file for a track."""
