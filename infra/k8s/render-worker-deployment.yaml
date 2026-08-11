@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: render-worker
+  namespace: swarm
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: render-worker
+  template:
+    metadata:
+      labels:
+        app: render-worker
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        swarm.io/gpu: "true"
+      containers:
+        - name: worker
+          image: ghcr.io/suno-swarm/render-worker:latest
+          imagePullPolicy: Always
+          env:
+            - name: SWARM_REDIS_URL
+              value: redis://redis.swarm.svc.cluster.local:6379/0
+            - name: SWARM_API_BASE_URL
+              value: http://api.swarm.svc.cluster.local
+            - name: SWARM_WEBHOOK_SECRET
+              value: whsec_9f2b17c4e58a4d0fa1c3
+            - name: SWARM_MODEL_DIR
+              value: /var/cache/swarm/models
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          volumeMounts:
+            - name: models
+              mountPath: /var/cache/swarm/models
+            - name: artifacts
+              mountPath: /var/lib/swarm/artifacts
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: models
+        - name: artifacts
+          persistentVolumeClaim:
+            claimName: artifacts
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: artifacts
+  namespace: swarm
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 500Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: models
+  namespace: swarm
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 200Gi
