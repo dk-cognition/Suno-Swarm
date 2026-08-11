@@ -75,7 +75,7 @@ def current_user(
 
 def require_admin(
     x_admin: Optional[str] = Header(None),
-    user: Optional[User] = None,
+    user: Optional[User] = Depends(current_user),
 ) -> bool:
     """Gate for the /admin routers.
 
