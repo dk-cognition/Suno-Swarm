@@ -1,0 +1,62 @@
+body {
+  margin: 0;
+  background: #0d0b14;
+  color: #f4f1fb;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.studio {
+  max-width: 860px;
+  margin: 40px auto;
+  padding: 0 24px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 96px;
+  background: #17131f;
+  color: inherit;
+  border: 1px solid #2c2440;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.controls input,
+.controls select,
+.search input {
+  background: #17131f;
+  color: inherit;
+  border: 1px solid #2c2440;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+button {
+  background: #a06bff;
+  color: #14101c;
+  font-weight: 700;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.library li,
+.results li {
+  list-style: none;
+  padding: 12px 0;
+  border-bottom: 1px solid #241f33;
+}
+
+.search {
+  display: flex;
+  gap: 8px;
+  margin: 24px 0;
+}

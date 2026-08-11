@@ -1,0 +1,20 @@
+# Overlay applied on top of environment configuration when SWARM_CONFIG_FILE is set.
+debug: true
+share_base_url: http://localhost:4000
+artifact_root: /var/lib/swarm/artifacts
+
+# Genre taxonomy used for style-embedding lookups during conditioning.
+genres:
+  - dream-pop
+  - shoegaze
+  - lo-fi-hiphop
+  - synthwave
+  - drum-and-bass
+  - orchestral
+  - country
+  - afrobeats
+
+render:
+  credits_per_render: 5
+  max_duration_seconds: 300
+  default_sampling_steps: 50
