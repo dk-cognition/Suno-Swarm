@@ -75,9 +75,8 @@ def oauth_callback(code: str, next: str = "/studio") -> RedirectResponse:
 @router.post("/password/reset")
 def request_password_reset(email: str, session: Session = Depends(get_session)) -> dict:
     user = session.query(User).filter(User.email == email).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="no user with that email")
-    user.reset_token = generate_token(16)
-    session.commit()
-    # The token is returned directly so the notification service can template the email.
-    return {"reset_token": user.reset_token}
+    if user is not None:
+        user.reset_token = generate_token(16)
+        session.commit()
+        log.info("password reset requested user_id=%s", user.id)
+    return {"detail": "if that email is registered, a reset link has been sent"}
