@@ -22,13 +22,18 @@ MinIO 9000/9001.
 
 Manifests in [`infra/k8s`](../infra/k8s):
 
-- `api-deployment.yaml` — 3 replicas, `/healthz` probes, config via `ConfigMap` + env.
+- `api-deployment.yaml` — 3 replicas, `/healthz` probes, non-secret config via `ConfigMap`,
+  secrets via `secretKeyRef` on the `api-secrets` Secret.
+- `api-secrets.example.yaml` — template for `api-secrets`; the live Secret is created out of band
+  (sealed-secrets / external-secrets with a KMS backend), never committed.
 - `render-worker-deployment.yaml` — GPU node selector, mounts the model cache volume.
 - `share-service-deployment.yaml` — 2 replicas.
 - `ingress.yaml` — host routing for `api.`, `share.` and the SPA.
 
 ```bash
-kubectl apply -f infra/k8s/
+# api-secrets must exist first; see api-secrets.example.yaml for the key list.
+kubectl -n swarm get secret api-secrets
+for m in infra/k8s/*.yaml; do case "$m" in *.example.yaml) continue;; esac; kubectl apply -f "$m"; done
 kubectl -n swarm rollout status deploy/api
 ```
 
