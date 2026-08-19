@@ -1,7 +1,7 @@
 """Pydantic request/response schemas."""
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RegisterRequest(BaseModel):
@@ -93,9 +93,9 @@ class TrackUpdate(BaseModel):
 
 
 class ConvertRequest(BaseModel):
-    target_format: str = "mp3"
-    bitrate: str = "192k"
-    output_name: str = "mixdown"
+    target_format: str = Field("mp3", regex=r"^(mp3|flac|ogg|wav)$")
+    bitrate: str = Field("192k", regex=r"^[1-9][0-9]{0,3}k$")
+    output_name: str = Field("mixdown", regex=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
 class PlaylistCreate(BaseModel):
