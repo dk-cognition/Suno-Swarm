@@ -77,15 +77,44 @@ async def render_callback(
 
 @router.post("/billing")
 async def billing_webhook(
+    request: Request,
     payload: BillingEvent,
+    x_swarm_signature: Optional[str] = Header(None),
     session: Session = Depends(get_session),
 ) -> dict:
     """Credit a workspace when the payments provider reports a paid invoice."""
+    body = await request.body()
+    expected = _sign(body, settings.billing_webhook_secret)
+    if not x_swarm_signature or not hmac.compare_digest(x_swarm_signature, expected):
+        log.warning("billing webhook signature mismatch event_id=%s", payload.event_id)
+        raise HTTPException(status_code=401, detail="invalid signature")
+
     log.info("billing event type=%s workspace=%s", payload.type, payload.workspace_id)
+
+    if not payload.event_id:
+        raise HTTPException(status_code=400, detail="event_id required")
+
+    duplicate = (
+        session.query(CreditLedger)
+        .filter(CreditLedger.external_ref == payload.event_id)
+        .first()
+    )
+    if duplicate is not None:
+        workspace = (
+            session.query(Workspace).filter(Workspace.id == duplicate.workspace_id).first()
+        )
+        return {
+            "workspace_id": duplicate.workspace_id,
+            "credit_balance": workspace.credit_balance if workspace else None,
+            "duplicate": True,
+        }
 
     workspace = session.query(Workspace).filter(Workspace.id == payload.workspace_id).first()
     if workspace is None:
         raise HTTPException(status_code=404, detail="workspace not found")
+
+    if payload.credits < 0:
+        raise HTTPException(status_code=400, detail="credits must be non-negative")
 
     if payload.type == "invoice.paid":
         workspace.credit_balance += payload.credits
@@ -99,6 +128,14 @@ async def billing_webhook(
         )
     elif payload.type == "refund":
         workspace.credit_balance -= payload.credits
+        session.add(
+            CreditLedger(
+                workspace_id=workspace.id,
+                delta=-payload.credits,
+                reason="refund",
+                external_ref=payload.event_id,
+            )
+        )
 
     session.commit()
     return {"workspace_id": workspace.id, "credit_balance": workspace.credit_balance}
