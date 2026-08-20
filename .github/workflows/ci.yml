@@ -18,7 +18,7 @@ jobs:
       - name: Unit tests
         working-directory: services/api
         run: |
-          pip install pytest
+          pip install pytest pyyaml requests
           pytest -q
 
   share-service:

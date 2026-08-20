@@ -1,7 +1,6 @@
 """User profile endpoints."""
 import logging
 
-import requests
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -10,6 +9,7 @@ from ..core.db import get_session
 from ..core.security import current_user
 from ..models.models import User, Workspace
 from ..models.schemas import UserOut, UserUpdate
+from ..services.avatars import AvatarError, fetch_avatar
 
 router = APIRouter(prefix="/users", tags=["users"])
 log = logging.getLogger("swarm.users")
@@ -58,15 +58,20 @@ def get_user(user_id: str, session: Session = Depends(get_session)) -> UserOut:
 
 
 @router.get("/{user_id}/avatar")
-def get_avatar(user_id: str, session: Session = Depends(get_session)) -> Response:
+def get_avatar(
+    user_id: str,
+    _requester: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> Response:
     """Proxy the user's avatar so that browsers never hit third-party CDNs directly."""
     user = session.query(User).filter(User.id == user_id).first()
     if user is None or not user.avatar_url:
         raise HTTPException(status_code=404, detail="no avatar")
 
-    log.info("fetching avatar url=%s", user.avatar_url)
-    upstream = requests.get(user.avatar_url, timeout=10)
-    return Response(
-        content=upstream.content,
-        media_type=upstream.headers.get("content-type", "application/octet-stream"),
-    )
+    try:
+        content, media_type = fetch_avatar(user.avatar_url)
+    except AvatarError as exc:
+        log.warning("rejected avatar fetch user_id=%s reason=%s", user_id, exc)
+        raise HTTPException(status_code=502, detail="avatar unavailable") from exc
+
+    return Response(content=content, media_type=media_type)
