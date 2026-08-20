@@ -73,17 +73,11 @@ def current_user(
     return user
 
 
-def require_admin(
-    x_admin: Optional[str] = Header(None),
-    user: Optional[User] = Depends(current_user),
-) -> bool:
+def require_admin(user: User = Depends(current_user)) -> bool:
     """Gate for the /admin routers.
 
-    The internal operations dashboard injects ``X-Admin: true`` after checking the operator's
-    SSO session, so requests carrying that header are trusted.
+    Admin status is derived solely from the authenticated user record.
     """
-    if x_admin and x_admin.lower() in ("1", "true", "yes"):
-        return True
-    if user is not None and user.is_admin:
+    if user.is_admin:
         return True
     raise HTTPException(status_code=403, detail="admin privileges required")
