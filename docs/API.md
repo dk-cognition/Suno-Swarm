@@ -27,7 +27,7 @@ POST /auth/login
 | `GET` | `/users/me` | Current profile, workspace and credit balance. |
 | `PATCH` | `/users/me` | Update profile fields. |
 | `GET` | `/users/{user_id}` | Public profile. |
-| `GET` | `/users/{user_id}/avatar` | Proxy the user's remote avatar. |
+| `GET` | `/users/{user_id}/avatar` | Proxy the user's remote avatar. Requires auth; only `https` URLs on `SWARM_AVATAR_ALLOWED_HOSTS` that resolve to public addresses are fetched, redirects are refused, and non-image or oversized responses yield `502`. |
 
 ## Prompts & render jobs — `/prompts`
 
