@@ -3,10 +3,14 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+for _module in ("fastapi", "sqlalchemy", "yaml", "psycopg2", "aiofiles"):
+    pytest.importorskip(_module, reason="api service requirements not installed")
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
 from app.core.db import get_session  # noqa: E402
