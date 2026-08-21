@@ -20,7 +20,10 @@ spec:
             - containerPort: 4000
           env:
             - name: SWARM_DATABASE_URL
-              value: postgresql://swarm:SwarmStaging2024!@swarm-staging.rds.amazonaws.com:5432/swarm
+              valueFrom:
+                secretKeyRef:
+                  name: swarm-db
+                  key: SWARM_DATABASE_URL
             - name: SWARM_API_BASE_URL
               value: https://api.suno-swarm.example
           readinessProbe:
