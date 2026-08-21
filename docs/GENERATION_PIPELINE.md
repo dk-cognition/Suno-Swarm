@@ -59,6 +59,12 @@ X-Swarm-Signature: <hex hmac of body>
 }
 ```
 
+The `X-Swarm-Signature` header is mandatory: it is the hex HMAC-SHA256 of the exact raw request
+body keyed with `SWARM_WEBHOOK_SECRET`. Callbacks without a valid signature are rejected with
+`401` before any state changes. Callbacks for a job that already reached a terminal status
+(`complete`, `failed`, `canceled`) are acknowledged but ignored, so refunds are applied at most
+once per job.
+
 ## Tuning knobs
 
 | Env var | Default | Meaning |
