@@ -1,4 +1,7 @@
 """Celery entrypoints for the render worker."""
+import hashlib
+import hmac
+import json
 import logging
 import os
 import shutil
@@ -54,7 +57,16 @@ def _publish(workspace_id: str, track_id: str, mixdown_path: str, stems: Dict[st
 def _callback(body: Dict[str, Any]) -> None:
     url = f"{worker_settings.api_base_url}/webhooks/render"
     log.info("posting render callback job_id=%s status=%s", body.get("job_id"), body.get("status"))
-    requests.post(url, json=body, timeout=15)
+    raw = json.dumps(body).encode("utf-8")
+    signature = hmac.new(
+        worker_settings.webhook_secret.encode("utf-8"), raw, hashlib.sha256
+    ).hexdigest()
+    requests.post(
+        url,
+        data=raw,
+        headers={"Content-Type": "application/json", "X-Swarm-Signature": signature},
+        timeout=15,
+    )
 
 
 @celery_app.task(name="worker.tasks.render_track", bind=True, max_retries=3)

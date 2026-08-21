@@ -1,6 +1,4 @@
 """Inbound webhooks: render-worker callbacks and payments provider events."""
-import hashlib
-import hmac
 import logging
 from typing import Optional
 
@@ -12,13 +10,20 @@ from ..core.db import get_session
 from ..core.security import generate_token
 from ..models.models import CreditLedger, Prompt, RenderJob, ShareLink, Stem, Track, Workspace
 from ..models.schemas import BillingEvent, RenderCallback
+from ..services.webhook_auth import is_valid_signature
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 log = logging.getLogger("swarm.webhooks")
 
 
-def _sign(body: bytes, secret: str) -> str:
-    return hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+TERMINAL_STATUSES = ("complete", "failed", "canceled")
+REFUND_CREDITS = 5
+
+
+def _require_signature(body: bytes, provided: Optional[str], secret: str) -> None:
+    """Reject the request unless it carries a valid HMAC signature."""
+    if not is_valid_signature(body, provided, secret):
+        raise HTTPException(status_code=401, detail="invalid webhook signature")
 
 
 @router.post("/render")
@@ -30,13 +35,20 @@ async def render_callback(
 ) -> dict:
     """Consume a completion callback from the render worker."""
     body = await request.body()
-    expected = _sign(body, settings.webhook_secret)
-    if x_swarm_signature and x_swarm_signature != expected:
-        log.warning("render callback signature mismatch job_id=%s", payload.job_id)
+    _require_signature(body, x_swarm_signature, settings.webhook_secret)
 
     job = session.query(RenderJob).filter(RenderJob.id == payload.job_id).first()
     if job is None:
         raise HTTPException(status_code=404, detail="job not found")
+
+    if job.status in TERMINAL_STATUSES:
+        log.info("ignoring callback for settled job job_id=%s status=%s", job.id, job.status)
+        existing = session.query(Track).filter(Track.job_id == job.id).first()
+        return {
+            "job_id": job.id,
+            "status": job.status,
+            **({"track_id": existing.id} if existing is not None else {}),
+        }
 
     job.status = payload.status
     job.stage_timings = payload.stage_timings
@@ -45,10 +57,24 @@ async def render_callback(
 
     if payload.status != "complete":
         workspace = session.query(Workspace).filter(Workspace.id == job.workspace_id).first()
-        if workspace is not None:
-            workspace.credit_balance += 5
+        refund_ref = f"render_refund:{job.id}"
+        already_refunded = (
+            session.query(CreditLedger)
+            .filter(
+                CreditLedger.reason == "render_refund",
+                CreditLedger.external_ref == refund_ref,
+            )
+            .first()
+        )
+        if workspace is not None and already_refunded is None:
+            workspace.credit_balance += REFUND_CREDITS
             session.add(
-                CreditLedger(workspace_id=workspace.id, delta=5, reason="render_refund")
+                CreditLedger(
+                    workspace_id=workspace.id,
+                    delta=REFUND_CREDITS,
+                    reason="render_refund",
+                    external_ref=refund_ref,
+                )
             )
         session.commit()
         return {"job_id": job.id, "status": job.status}
