@@ -61,7 +61,7 @@ POST /prompts
 | `PATCH` | `/tracks/{track_id}` | Rename / retag / toggle visibility. |
 | `DELETE` | `/tracks/{track_id}` | Soft delete. |
 | `GET` | `/tracks/{track_id}/download` | Download the mixdown. |
-| `GET` | `/tracks/{track_id}/stems/{name}` | Download a single stem file. |
+| `GET` | `/tracks/{track_id}/stems/{name}` | Download a single stem (`vocals`/`drums`/`bass`/`other`); requires auth, caller's workspace only. |
 | `POST` | `/tracks/{track_id}/convert` | Transcode to another container/codec. |
 
 ## Playlists — `/playlists`
