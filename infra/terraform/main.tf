@@ -23,8 +23,8 @@ variable "environment" {
 }
 
 variable "db_password" {
-  type    = string
-  default = "SwarmStaging2024!"
+  type      = string
+  sensitive = true
 }
 
 # ---------------------------------------------------------------------------

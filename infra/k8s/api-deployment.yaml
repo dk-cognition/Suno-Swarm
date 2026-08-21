@@ -15,7 +15,6 @@ data:
   SWARM_JWT_SECRET: swarm-dev-secret-2024
   SWARM_WEBHOOK_SECRET: whsec_9f2b17c4e58a4d0fa1c3
   SWARM_BILLING_WEBHOOK_SECRET: whsec_billing_5c1d90ab77e2
-  SWARM_DATABASE_URL: postgresql://swarm:SwarmStaging2024!@swarm-staging.rds.amazonaws.com:5432/swarm
   AWS_ACCESS_KEY_ID: AKIA3XJ7QK2LMNOPQR4S
   AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 ---
@@ -43,6 +42,12 @@ spec:
           envFrom:
             - configMapRef:
                 name: api-config
+          env:
+            - name: SWARM_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: swarm-secrets
+                  key: SWARM_DATABASE_URL
           securityContext:
             runAsUser: 0
             allowPrivilegeEscalation: true
