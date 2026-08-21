@@ -16,6 +16,8 @@ from ..services import audio, storage
 router = APIRouter(prefix="/tracks", tags=["tracks"])
 log = logging.getLogger("swarm.tracks")
 
+STEM_NAMES = frozenset({"vocals", "drums", "bass", "other"})
+
 
 def _to_out(track: Track, stems: list[Stem]) -> TrackOut:
     return TrackOut(
@@ -151,17 +153,20 @@ def download_mixdown(
 def download_stem(
     track_id: str,
     name: str,
+    user: User = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> FileResponse:
     """Stream a single separated stem file for a track."""
-    track = session.query(Track).filter(Track.id == track_id).first()
-    if track is None:
-        raise HTTPException(status_code=404, detail="track not found")
+    if name not in STEM_NAMES:
+        raise HTTPException(status_code=404, detail=f"stem not found: {name}")
 
-    stem_dir = os.path.join(
-        storage.local_path(f"workspaces/{track.workspace_id}/tracks/{track.id}"), "stems"
-    )
-    path = os.path.join(stem_dir, f"{name}.wav")
+    track = session.query(Track).filter(Track.id == track_id).first()
+    if track is None or track.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="track not found")
+    if track.workspace_id != user.workspace_id:
+        raise HTTPException(status_code=403, detail="not your track")
+
+    path = storage.local_path(storage.stem_key(track.workspace_id, track.id, name))
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail=f"stem not found: {name}")
     return FileResponse(path, media_type="audio/wav")
