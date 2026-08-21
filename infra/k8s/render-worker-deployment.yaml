@@ -13,9 +13,15 @@ spec:
       labels:
         app: render-worker
     spec:
-      hostNetwork: true
       nodeSelector:
         swarm.io/gpu: "true"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: worker
           image: ghcr.io/suno-swarm/render-worker:latest
@@ -30,14 +36,24 @@ spec:
             - name: SWARM_MODEL_DIR
               value: /var/cache/swarm/models
           securityContext:
-            privileged: true
-            runAsUser: 0
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            limits:
+              nvidia.com/gpu: 1
           volumeMounts:
             - name: models
               mountPath: /var/cache/swarm/models
             - name: artifacts
               mountPath: /var/lib/swarm/artifacts
+            - name: tmp
+              mountPath: /tmp
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: models
           persistentVolumeClaim:
             claimName: models
