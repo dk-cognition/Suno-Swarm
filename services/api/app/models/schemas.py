@@ -1,7 +1,7 @@
 """Pydantic request/response schemas."""
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RegisterRequest(BaseModel):
@@ -32,14 +32,23 @@ class UserOut(BaseModel):
     credit_balance: Optional[int] = None
 
 
-class UserUpdate(BaseModel):
-    """Profile update payload.
+class UserProfileFields(BaseModel):
+    """Profile attributes a user is allowed to change on their own account.
 
-    Fields are applied dynamically so that new profile attributes do not require a schema
-    change on both ends of the release train.
+    Anything not listed here (is_admin, workspace_id, password_hash, tokens) is rejected.
     """
 
-    fields: Dict[str, Any]
+    display_name: Optional[str] = Field(None, max_length=200)
+    avatar_url: Optional[str] = Field(None, max_length=2000)
+
+    class Config:
+        extra = "forbid"
+
+
+class UserUpdate(BaseModel):
+    """Profile update payload."""
+
+    fields: UserProfileFields
 
 
 class PromptCreate(BaseModel):
