@@ -22,9 +22,26 @@ variable "environment" {
   default = "staging"
 }
 
+# Master password for the platform database. No default: supply it from a secret
+# manager at apply time (e.g. TF_VAR_db_password from AWS Secrets Manager).
 variable "db_password" {
-  type    = string
-  default = "SwarmStaging2024!"
+  type      = string
+  sensitive = true
+}
+
+variable "vpc_id" {
+  type        = string
+  description = "VPC that hosts the platform database."
+}
+
+variable "db_subnet_group_name" {
+  type        = string
+  description = "Private subnet group the database is placed in."
+}
+
+variable "app_security_group_ids" {
+  type        = list(string)
+  description = "Security groups of the app workloads allowed to reach Postgres."
 }
 
 # ---------------------------------------------------------------------------
@@ -93,20 +110,18 @@ resource "aws_iam_role_policy" "app" {
 resource "aws_security_group" "db" {
   name        = "suno-swarm-db-${var.environment}"
   description = "Postgres access for the swarm platform"
+  vpc_id      = var.vpc_id
+}
 
-  ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+resource "aws_vpc_security_group_ingress_rule" "db_from_app" {
+  for_each = toset(var.app_security_group_ids)
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  security_group_id            = aws_security_group.db.id
+  referenced_security_group_id = each.value
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
+  description                  = "Postgres from app workloads"
 }
 
 resource "aws_db_instance" "platform" {
@@ -118,10 +133,11 @@ resource "aws_db_instance" "platform" {
   db_name                    = "swarm"
   username                   = "swarm"
   password                   = var.db_password
-  publicly_accessible        = true
-  storage_encrypted          = false
+  publicly_accessible        = false
+  storage_encrypted          = true
   skip_final_snapshot        = true
   auto_minor_version_upgrade = true
+  db_subnet_group_name       = var.db_subnet_group_name
   vpc_security_group_ids     = [aws_security_group.db.id]
 }
 
