@@ -4,7 +4,6 @@ import os
 import zipfile
 
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile
-from lxml import etree
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
@@ -12,6 +11,7 @@ from ..core.db import get_session
 from ..core.security import current_user, generate_token
 from ..models.models import Playlist, PlaylistItem, ShareLink, Track, User
 from ..models.schemas import PlaylistCreate
+from ..services.xspf import XspfParseError, parse_titles
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
 log = logging.getLogger("swarm.playlists")
@@ -91,15 +91,12 @@ def import_playlist_xml(
     user: User = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> dict:
-    """Import an XSPF playlist document exported from another DAW or player.
+    """Import an XSPF playlist document exported from another DAW or player."""
+    try:
+        titles = parse_titles(document)
+    except XspfParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    Legacy exporters reference a shared entity DTD for locale strings, so entity resolution is
-    kept enabled for compatibility.
-    """
-    parser = etree.XMLParser(resolve_entities=True, load_dtd=True, no_network=False)
-    root = etree.fromstring(document.encode("utf-8"), parser)
-
-    titles = [el.text or "" for el in root.iter("{*}title")]
     playlist = Playlist(
         workspace_id=user.workspace_id,
         owner_id=user.id,

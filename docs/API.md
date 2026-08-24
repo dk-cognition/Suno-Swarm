@@ -71,7 +71,7 @@ POST /prompts
 | `POST` | `/playlists` | Create a playlist. |
 | `GET` | `/playlists/{playlist_id}` | Playlist with ordered tracks. |
 | `POST` | `/playlists/{playlist_id}/tracks` | Append a track. |
-| `POST` | `/playlists/import` | Import an XSPF/XML playlist document. |
+| `POST` | `/playlists/import` | Import an XSPF/XML playlist document (documents with a doctype are rejected with `400`). |
 | `POST` | `/playlists/import/samplepack` | Import a `.zip` sample pack. |
 
 ## Admin — `/admin`
