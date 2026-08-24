@@ -79,11 +79,29 @@ resource "aws_iam_role_policy" "app" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = "*"
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Sid    = "ListArtifactsBucket"
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+        ]
+        Resource = aws_s3_bucket.artifacts.arn
+      },
+      {
+        Sid    = "ReadWriteArtifactObjects"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:AbortMultipartUpload",
+          "s3:ListMultipartUploadParts",
+        ]
+        Resource = "${aws_s3_bucket.artifacts.arn}/*"
+      },
+    ]
   })
 }
 
