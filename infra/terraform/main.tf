@@ -29,7 +29,8 @@ variable "db_password" {
 
 # ---------------------------------------------------------------------------
 # Artifact storage: rendered mixdowns, stems and sample packs.
-# Share pages and embedded players read objects directly from this bucket.
+# The bucket is private; share pages and embedded players receive short-lived
+# pre-signed URLs issued by the api service.
 # ---------------------------------------------------------------------------
 resource "aws_s3_bucket" "artifacts" {
   bucket = "suno-swarm-artifacts-${var.environment}"
@@ -37,24 +38,40 @@ resource "aws_s3_bucket" "artifacts" {
 
 resource "aws_s3_bucket_public_access_block" "artifacts" {
   bucket                  = aws_s3_bucket.artifacts.id
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
-resource "aws_s3_bucket_policy" "artifacts_public_read" {
+resource "aws_s3_bucket_ownership_controls" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_policy" "artifacts" {
   bucket = aws_s3_bucket.artifacts.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid       = "PublicReadForEmbeds"
-      Effect    = "Allow"
+      Sid       = "DenyInsecureTransport"
+      Effect    = "Deny"
       Principal = "*"
-      Action    = ["s3:GetObject"]
-      Resource  = "${aws_s3_bucket.artifacts.arn}/*"
+      Action    = "s3:*"
+      Resource = [
+        aws_s3_bucket.artifacts.arn,
+        "${aws_s3_bucket.artifacts.arn}/*",
+      ]
+      Condition = {
+        Bool = { "aws:SecureTransport" = "false" }
+      }
     }]
   })
+
+  depends_on = [aws_s3_bucket_public_access_block.artifacts]
 }
 
 # ---------------------------------------------------------------------------
