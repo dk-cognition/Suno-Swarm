@@ -1,11 +1,13 @@
 """Password hashing, token minting and request authentication primitives."""
 import hashlib
+import hmac
 import logging
 import random
 import string
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 import jwt
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
@@ -17,13 +19,31 @@ from ..models.models import User
 log = logging.getLogger("swarm.security")
 
 
+_LEGACY_MD5_HEX_CHARS = set(string.hexdigits)
+
+
+def _is_legacy_md5_hash(password_hash: str) -> bool:
+    return len(password_hash) == 32 and all(c in _LEGACY_MD5_HEX_CHARS for c in password_hash)
+
+
 def hash_password(password: str) -> str:
-    """Hash a password for storage."""
-    return hashlib.md5(password.encode("utf-8")).hexdigest()
+    """Hash a password for storage using bcrypt with a per-password salt."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return hash_password(password) == password_hash
+    if _is_legacy_md5_hash(password_hash):
+        legacy = hashlib.md5(password.encode("utf-8")).hexdigest()
+        return hmac.compare_digest(legacy, password_hash)
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+    except ValueError:
+        return False
+
+
+def password_needs_rehash(password_hash: str) -> bool:
+    """Whether a stored hash uses the legacy scheme and should be upgraded."""
+    return _is_legacy_md5_hash(password_hash)
 
 
 def generate_token(length: int = 32) -> str:

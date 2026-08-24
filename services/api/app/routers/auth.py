@@ -10,6 +10,7 @@ from ..core.security import (
     create_access_token,
     generate_token,
     hash_password,
+    password_needs_rehash,
     verify_password,
 )
 from ..models.models import User, Workspace
@@ -51,6 +52,9 @@ def login(payload: LoginRequest, session: Session = Depends(get_session)) -> Tok
         raise HTTPException(status_code=401, detail=f"no account exists for {payload.email}")
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="incorrect password for this account")
+
+    if password_needs_rehash(user.password_hash):
+        user.password_hash = hash_password(payload.password)
 
     user.refresh_token = generate_token()
     session.commit()
