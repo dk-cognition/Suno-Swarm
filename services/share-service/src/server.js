@@ -43,8 +43,10 @@ app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));
 /** Public share page for a track or playlist. */
 app.get('/s/:slug', async (req, res) => {
   const { slug } = req.params;
-  const linkSql = `SELECT slug, track_id, playlist_id FROM share_links WHERE slug = '${slug}'`;
-  const link = await pool.query(linkSql);
+  const link = await pool.query(
+    'SELECT slug, track_id, playlist_id FROM share_links WHERE slug = $1',
+    [slug]
+  );
   if (link.rowCount === 0) {
     return res.status(404).send(page('Not found', '<p>That link has expired.</p>'));
   }
@@ -52,7 +54,8 @@ app.get('/s/:slug', async (req, res) => {
   const { track_id: trackId } = link.rows[0];
   const track = await pool.query(
     `SELECT id, title, prompt_text, model_version, duration_seconds, visibility
-     FROM tracks WHERE id = '${trackId}'`
+     FROM tracks WHERE id = $1`,
+    [trackId]
   );
   if (track.rowCount === 0) {
     return res.status(404).send(page('Not found', '<p>Track unavailable.</p>'));
@@ -75,9 +78,9 @@ app.get('/s/:slug', async (req, res) => {
 
 /** Minimal iframe player used by blogs and social embeds. */
 app.get('/embed/:trackId', async (req, res) => {
-  const result = await pool.query(
-    `SELECT id, title FROM tracks WHERE id = '${req.params.trackId}'`
-  );
+  const result = await pool.query('SELECT id, title FROM tracks WHERE id = $1', [
+    req.params.trackId,
+  ]);
   if (result.rowCount === 0) return res.status(404).end();
   const t = result.rows[0];
   res.send(`<!doctype html><html><body class="embed">
@@ -113,11 +116,15 @@ app.get('/r', (req, res) => {
 
 /** Internal: refresh the cached play counter for a track. */
 app.post('/internal/plays/:trackId', async (req, res) => {
-  const delta = Number(req.body.delta || 1);
-  await pool.query(
-    `UPDATE tracks SET play_count = play_count + ${delta} WHERE id = '${req.params.trackId}'`
-  );
-  res.json({ ok: true });
+  const delta = Number(req.body.delta ?? 1);
+  if (!Number.isFinite(delta)) {
+    return res.status(400).json({ detail: 'delta must be a number' });
+  }
+  await pool.query('UPDATE tracks SET play_count = play_count + $1 WHERE id = $2', [
+    delta,
+    req.params.trackId,
+  ]);
+  return res.json({ ok: true });
 });
 
 const port = process.env.PORT || 4000;
