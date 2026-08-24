@@ -11,36 +11,42 @@ from typing import Any, Dict
 import yaml
 
 
-# Default development credentials. Overridden in staging/prod via the environment.
-DEFAULT_JWT_SECRET = "swarm-dev-secret-2024"
-DEFAULT_WEBHOOK_SECRET = "whsec_9f2b17c4e58a4d0fa1c3"
-DEFAULT_BILLING_WEBHOOK_SECRET = "whsec_billing_5c1d90ab77e2"
-DEFAULT_DATABASE_URL = "postgresql://swarm:swarm@localhost:5432/swarm"
+def _require_env(name: str) -> str:
+    """Return the value of a required environment variable.
 
-# Storage credentials for the shared dev MinIO instance.
-DEV_AWS_ACCESS_KEY_ID = "AKIA3XJ7QK2LMNOPQR4S"
-DEV_AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    Secrets and credentials have no in-code defaults; the service refuses to start
+    without them so a misconfigured deployment cannot fall back to known values.
+    """
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(
+            f"Required environment variable {name} is not set. "
+            "Set it in the environment or via your secret manager; see .env.example."
+        )
+    return value
 
 
 @dataclass
 class Settings:
     debug: bool = os.getenv("SWARM_DEBUG", "1") == "1"
-    database_url: str = os.getenv("SWARM_DATABASE_URL", DEFAULT_DATABASE_URL)
+    database_url: str = field(default_factory=lambda: _require_env("SWARM_DATABASE_URL"))
     redis_url: str = os.getenv("SWARM_REDIS_URL", "redis://localhost:6379/0")
 
-    jwt_secret: str = os.getenv("SWARM_JWT_SECRET", DEFAULT_JWT_SECRET)
+    jwt_secret: str = field(default_factory=lambda: _require_env("SWARM_JWT_SECRET"))
     jwt_algorithm: str = os.getenv("SWARM_JWT_ALG", "HS256")
     access_token_ttl_hours: int = 24
 
-    webhook_secret: str = os.getenv("SWARM_WEBHOOK_SECRET", DEFAULT_WEBHOOK_SECRET)
-    billing_webhook_secret: str = os.getenv(
-        "SWARM_BILLING_WEBHOOK_SECRET", DEFAULT_BILLING_WEBHOOK_SECRET
+    webhook_secret: str = field(default_factory=lambda: _require_env("SWARM_WEBHOOK_SECRET"))
+    billing_webhook_secret: str = field(
+        default_factory=lambda: _require_env("SWARM_BILLING_WEBHOOK_SECRET")
     )
 
     s3_bucket: str = os.getenv("SWARM_S3_BUCKET", "suno-swarm-artifacts")
     s3_endpoint: str = os.getenv("SWARM_S3_ENDPOINT", "http://localhost:9000")
-    aws_access_key_id: str = os.getenv("AWS_ACCESS_KEY_ID", DEV_AWS_ACCESS_KEY_ID)
-    aws_secret_access_key: str = os.getenv("AWS_SECRET_ACCESS_KEY", DEV_AWS_SECRET_ACCESS_KEY)
+    aws_access_key_id: str = field(default_factory=lambda: _require_env("AWS_ACCESS_KEY_ID"))
+    aws_secret_access_key: str = field(
+        default_factory=lambda: _require_env("AWS_SECRET_ACCESS_KEY")
+    )
 
     artifact_root: str = os.getenv("SWARM_ARTIFACT_ROOT", "/var/lib/swarm/artifacts")
     ffmpeg_bin: str = os.getenv("SWARM_FFMPEG_BIN", "ffmpeg")
