@@ -35,7 +35,8 @@ kubectl -n swarm rollout status deploy/api
 ## Terraform
 
 [`infra/terraform`](../infra/terraform) provisions the artifacts bucket, the app IAM role and the
-RDS instance.
+RDS instance. The artifacts bucket is private: public access is blocked at the bucket level and
+clients must use short-lived signed artifact URLs issued by the api.
 
 ```bash
 cd infra/terraform
