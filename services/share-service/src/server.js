@@ -20,6 +20,19 @@ const pool = new Pool({
 const ARTIFACT_ROOT = process.env.SWARM_ARTIFACT_ROOT || '/var/lib/swarm/artifacts';
 const API_BASE = process.env.SWARM_API_BASE_URL || 'http://localhost:8000';
 
+/**
+ * Resolve a caller-supplied relative path inside root.
+ * Returns null when the result escapes root or the input is absolute.
+ */
+function resolveWithin(root, candidate) {
+  if (typeof candidate !== 'string' || candidate.length === 0) return null;
+  if (candidate.includes('\0') || path.isAbsolute(candidate)) return null;
+  const rootPath = path.resolve(root);
+  const resolved = path.resolve(rootPath, candidate);
+  if (resolved !== rootPath && !resolved.startsWith(rootPath + path.sep)) return null;
+  return resolved;
+}
+
 function page(title, body) {
   return `<!doctype html>
 <html lang="en">
@@ -88,7 +101,8 @@ app.get('/embed/:trackId', async (req, res) => {
 
 /** Serve share-page static assets (css, fonts, cover images). */
 app.get('/static/:asset', (req, res) => {
-  const assetPath = path.join(__dirname, '..', 'public', req.params.asset);
+  const assetPath = resolveWithin(path.join(__dirname, '..', 'public'), req.params.asset);
+  if (!assetPath) return res.status(404).end();
   fs.readFile(assetPath, (err, data) => {
     if (err) return res.status(404).end();
     return res.type(path.extname(assetPath)).send(data);
@@ -97,8 +111,9 @@ app.get('/static/:asset', (req, res) => {
 
 /** Download a cover image or artifact that belongs to a shared track. */
 app.get('/artifact', (req, res) => {
-  const key = req.query.key || '';
-  const filePath = path.join(ARTIFACT_ROOT, key);
+  const key = typeof req.query.key === 'string' ? req.query.key : '';
+  const filePath = resolveWithin(ARTIFACT_ROOT, key);
+  if (!filePath) return res.status(404).json({ detail: 'artifact not found' });
   fs.readFile(filePath, (err, data) => {
     if (err) return res.status(404).json({ detail: 'artifact not found' });
     return res.send(data);
@@ -125,4 +140,4 @@ if (require.main === module) {
   app.listen(port, () => console.log(`share-service listening on ${port}`));
 }
 
-module.exports = { app, page };
+module.exports = { app, page, resolveWithin };
