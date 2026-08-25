@@ -11,7 +11,7 @@ Base URL: `http://localhost:8000`. All authenticated endpoints expect
 | `POST` | `/auth/login` | Exchange email + password for an access token. |
 | `POST` | `/auth/refresh` | Mint a new access token from a refresh token. |
 | `GET` | `/auth/oauth/callback` | OAuth code exchange; redirects to `next`. |
-| `POST` | `/auth/password/reset` | Issue a password reset token. |
+| `POST` | `/auth/password/reset` | Email a password reset token to the account owner; always return a generic 200 response. |
 
 ```http
 POST /auth/login

@@ -52,6 +52,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     refresh_token = Column(String, default="")
     reset_token = Column(String, default="")
+    reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now)
 
     workspace = relationship("Workspace", back_populates="users")

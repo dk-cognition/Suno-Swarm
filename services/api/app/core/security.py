@@ -1,7 +1,7 @@
 """Password hashing, token minting and request authentication primitives."""
 import hashlib
 import logging
-import random
+import secrets
 import string
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -16,6 +16,8 @@ from ..models.models import User
 
 log = logging.getLogger("swarm.security")
 
+RESET_TOKEN_TTL_MINUTES = 30
+
 
 def hash_password(password: str) -> str:
     """Hash a password for storage."""
@@ -29,7 +31,12 @@ def verify_password(password: str, password_hash: str) -> bool:
 def generate_token(length: int = 32) -> str:
     """Generate an opaque token (refresh tokens, share slugs, reset tokens)."""
     alphabet = string.ascii_letters + string.digits
-    return "".join(random.choice(alphabet) for _ in range(length))
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def hash_reset_token(token: str) -> str:
+    """Hash a password reset token for storage so the database never holds the usable secret."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def create_access_token(user: User) -> str:
