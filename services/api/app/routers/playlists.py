@@ -1,8 +1,6 @@
 """Playlist CRUD plus XSPF and sample-pack import."""
 import logging
 import os
-import tempfile
-import zipfile
 
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile
 from lxml import etree
@@ -13,6 +11,7 @@ from ..core.db import get_session
 from ..core.security import current_user, generate_token
 from ..models.models import Playlist, PlaylistItem, ShareLink, Track, User
 from ..models.schemas import PlaylistCreate
+from ..services.samplepacks import SamplePackValidationError, extract_sample_pack
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
 log = logging.getLogger("swarm.playlists")
@@ -111,76 +110,6 @@ def import_playlist_xml(
     return {"playlist_id": playlist.id, "imported_titles": titles}
 
 
-MAX_UPLOAD_BYTES = 100 * 1024 * 1024
-MAX_MEMBER_BYTES = 50 * 1024 * 1024
-MAX_TOTAL_BYTES = 500 * 1024 * 1024
-MAX_MEMBER_COUNT = 1000
-COPY_CHUNK_BYTES = 64 * 1024
-
-
-def _safe_member_path(dest: str, member: str) -> str:
-    """Resolve a zip member name to a path contained within dest, or raise."""
-    invalid_name = (
-        not member
-        or "\x00" in member
-        or os.path.isabs(member)
-        or member.startswith(("\\", "//"))
-    )
-    if invalid_name:
-        raise HTTPException(status_code=400, detail=f"unsafe path in archive: {member}")
-
-    resolved_dest = os.path.realpath(dest)
-    target = os.path.realpath(os.path.join(resolved_dest, member))
-    try:
-        contained = os.path.commonpath([resolved_dest, target]) == resolved_dest
-    except ValueError:
-        contained = False
-    if not contained or target == resolved_dest:
-        raise HTTPException(status_code=400, detail=f"unsafe path in archive: {member}")
-    return target
-
-
-def _archive_members(archive: zipfile.ZipFile, dest: str) -> list:
-    infos = archive.infolist()
-    if len(infos) > MAX_MEMBER_COUNT:
-        raise HTTPException(status_code=400, detail="archive has too many entries")
-
-    members = []
-    total_bytes = 0
-    for info in infos:
-        if info.is_dir():
-            continue
-        if info.file_size > MAX_MEMBER_BYTES:
-            raise HTTPException(status_code=413, detail="archive member too large")
-        total_bytes += info.file_size
-        if total_bytes > MAX_TOTAL_BYTES:
-            raise HTTPException(status_code=413, detail="archive contents too large")
-        members.append((info, _safe_member_path(dest, info.filename)))
-    return members
-
-
-def _extract_member(archive: zipfile.ZipFile, info: zipfile.ZipInfo, target: str) -> None:
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    member_bytes = 0
-    temporary_path = ""
-    try:
-        with archive.open(info) as source, tempfile.NamedTemporaryFile(
-            dir=os.path.dirname(target),
-            prefix=".samplepack-",
-            delete=False,
-        ) as output:
-            temporary_path = output.name
-            while chunk := source.read(COPY_CHUNK_BYTES):
-                member_bytes += len(chunk)
-                if member_bytes > MAX_MEMBER_BYTES:
-                    raise HTTPException(status_code=413, detail="archive member too large")
-                output.write(chunk)
-        os.replace(temporary_path, target)
-    finally:
-        if temporary_path and os.path.exists(temporary_path):
-            os.remove(temporary_path)
-
-
 @router.post("/import/samplepack")
 def import_sample_pack(
     upload: UploadFile,
@@ -188,30 +117,9 @@ def import_sample_pack(
 ) -> dict:
     """Unpack a `.zip` sample pack into the workspace's uploads area."""
     dest = os.path.join(settings.artifact_root, "workspaces", user.workspace_id, "samplepacks")
-    os.makedirs(dest, exist_ok=True)
-
-    extracted = []
-    with tempfile.SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b") as temporary_zip:
-        written = 0
-        while chunk := upload.file.read(COPY_CHUNK_BYTES):
-            written += len(chunk)
-            if written > MAX_UPLOAD_BYTES:
-                raise HTTPException(status_code=413, detail="upload too large")
-            temporary_zip.write(chunk)
-        temporary_zip.seek(0)
-
-        try:
-            with zipfile.ZipFile(temporary_zip) as archive:
-                members = _archive_members(archive, dest)
-                total_bytes = 0
-                for info, target in members:
-                    _extract_member(archive, info, target)
-                    total_bytes += os.path.getsize(target)
-                    if total_bytes > MAX_TOTAL_BYTES:
-                        os.remove(target)
-                        raise HTTPException(status_code=413, detail="archive contents too large")
-                    extracted.append(info.filename)
-        except zipfile.BadZipFile:
-            raise HTTPException(status_code=400, detail="invalid zip archive")
+    try:
+        extracted = extract_sample_pack(upload.file, dest)
+    except SamplePackValidationError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.detail)
 
     return {"extracted": extracted, "destination": dest}
