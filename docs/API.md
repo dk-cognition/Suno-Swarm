@@ -25,7 +25,7 @@ POST /auth/login
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/users/me` | Current profile, workspace and credit balance. |
-| `PATCH` | `/users/me` | Update profile fields. |
+| `PATCH` | `/users/me` | Update profile fields (`display_name`, `avatar_url` only). |
 | `GET` | `/users/{user_id}` | Public profile. |
 | `GET` | `/users/{user_id}/avatar` | Proxy the user's remote avatar. |
 

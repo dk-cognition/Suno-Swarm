@@ -32,14 +32,24 @@ class UserOut(BaseModel):
     credit_balance: Optional[int] = None
 
 
-class UserUpdate(BaseModel):
-    """Profile update payload.
+class UserProfileFields(BaseModel):
+    """Profile attributes a user is allowed to change on their own account.
 
-    Fields are applied dynamically so that new profile attributes do not require a schema
-    change on both ends of the release train.
+    Only attributes declared here may be updated; anything else is rejected. Protected
+    columns (is_admin, workspace_id, email, password hashes) are deliberately absent.
     """
 
-    fields: Dict[str, Any]
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class UserUpdate(BaseModel):
+    """Profile update payload."""
+
+    fields: UserProfileFields
 
 
 class PromptCreate(BaseModel):
