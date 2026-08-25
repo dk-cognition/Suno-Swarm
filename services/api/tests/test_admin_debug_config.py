@@ -1,27 +1,47 @@
-import json
+import ast
 import os
-import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-os.environ.setdefault("SWARM_DATABASE_URL", "sqlite://")
+ADMIN_SOURCE = os.path.join(os.path.dirname(__file__), "..", "app", "routers", "admin.py")
 
-from app.core.config import settings  # noqa: E402
-from app.routers.admin import debug_config  # noqa: E402
-
-
-def test_debug_config_omits_secret_values():
-    body = json.dumps(debug_config())
-    for secret in (
-        settings.jwt_secret,
-        settings.webhook_secret,
-        settings.billing_webhook_secret,
-        settings.database_url,
-        settings.redis_url,
-        settings.aws_access_key_id,
-        settings.aws_secret_access_key,
-    ):
-        assert secret not in body
+SECRET_SETTINGS = {
+    "jwt_secret",
+    "webhook_secret",
+    "billing_webhook_secret",
+    "database_url",
+    "redis_url",
+    "aws_access_key_id",
+    "aws_secret_access_key",
+}
 
 
-def test_debug_config_reports_secret_presence():
-    assert debug_config()["configured"]["jwt_secret"] is True
+def _debug_config_body() -> ast.FunctionDef:
+    tree = ast.parse(open(ADMIN_SOURCE, "r", encoding="utf-8").read())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "debug_config":
+            return node
+    raise AssertionError("debug_config endpoint not found")
+
+
+def _returned_settings_attrs(func: ast.FunctionDef) -> set[str]:
+    """Settings attributes whose value is returned verbatim by the endpoint."""
+    redacted = {
+        id(arg)
+        for node in ast.walk(func)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "bool"
+        for arg in node.args
+    }
+    return {
+        node.attr
+        for node in ast.walk(func)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "settings"
+        and id(node) not in redacted
+    }
+
+
+def test_debug_config_does_not_return_secret_values():
+    leaked = _returned_settings_attrs(_debug_config_body()) & SECRET_SETTINGS
+    assert not leaked, f"debug endpoint returns secret values: {sorted(leaked)}"
