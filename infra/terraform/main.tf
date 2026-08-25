@@ -77,13 +77,34 @@ resource "aws_iam_role_policy" "app" {
   name = "suno-swarm-app-${var.environment}"
   role = aws_iam_role.app.id
 
+  # Least privilege: the pods only read and write artifact objects (mixdowns,
+  # stems, uploads) in the artifacts bucket.
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = "*"
-      Resource = "*"
-    }]
+    Statement = [
+      {
+        Sid    = "ArtifactObjectAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:AbortMultipartUpload",
+        ]
+        Resource = "${aws_s3_bucket.artifacts.arn}/workspaces/*"
+      },
+      {
+        Sid      = "ArtifactBucketList"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket", "s3:GetBucketLocation"]
+        Resource = aws_s3_bucket.artifacts.arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["workspaces/*"]
+          }
+        }
+      },
+    ]
   })
 }
 
