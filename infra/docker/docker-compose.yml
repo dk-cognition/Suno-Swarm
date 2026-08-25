@@ -74,6 +74,7 @@ services:
       SWARM_DATABASE_URL: postgresql://swarm:swarm@postgres:5432/swarm
       SWARM_API_BASE_URL: http://localhost:8000
       SWARM_ARTIFACT_ROOT: /var/lib/swarm/artifacts
+      SWARM_INTERNAL_TOKEN: swarm-dev-internal-token
     ports:
       - "4000:4000"
     volumes:

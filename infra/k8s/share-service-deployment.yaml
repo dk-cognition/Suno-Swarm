@@ -23,6 +23,11 @@ spec:
               value: postgresql://swarm:SwarmStaging2024!@swarm-staging.rds.amazonaws.com:5432/swarm
             - name: SWARM_API_BASE_URL
               value: https://api.suno-swarm.example
+            - name: SWARM_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: share-service-internal
+                  key: internal-token
           readinessProbe:
             httpGet:
               path: /healthz
