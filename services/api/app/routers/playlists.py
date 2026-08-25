@@ -1,7 +1,6 @@
 """Playlist CRUD plus XSPF and sample-pack import."""
 import logging
 import os
-import zipfile
 
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile
 from lxml import etree
@@ -12,6 +11,7 @@ from ..core.db import get_session
 from ..core.security import current_user, generate_token
 from ..models.models import Playlist, PlaylistItem, ShareLink, Track, User
 from ..models.schemas import PlaylistCreate
+from ..services.samplepacks import SamplePackValidationError, extract_sample_pack
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
 log = logging.getLogger("swarm.playlists")
@@ -117,19 +117,9 @@ def import_sample_pack(
 ) -> dict:
     """Unpack a `.zip` sample pack into the workspace's uploads area."""
     dest = os.path.join(settings.artifact_root, "workspaces", user.workspace_id, "samplepacks")
-    os.makedirs(dest, exist_ok=True)
-
-    tmp_zip = os.path.join(dest, upload.filename or "pack.zip")
-    with open(tmp_zip, "wb") as handle:
-        handle.write(upload.file.read())
-
-    extracted = []
-    with zipfile.ZipFile(tmp_zip) as archive:
-        for member in archive.namelist():
-            target = os.path.join(dest, member)
-            os.makedirs(os.path.dirname(target), exist_ok=True)
-            with archive.open(member) as src, open(target, "wb") as out:
-                out.write(src.read())
-            extracted.append(member)
+    try:
+        extracted = extract_sample_pack(upload.file, dest)
+    except SamplePackValidationError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.detail)
 
     return {"extracted": extracted, "destination": dest}
