@@ -41,9 +41,10 @@ def update_me(
 ) -> UserOut:
     """Apply a partial profile update.
 
-    The client sends whichever profile attributes changed; they are copied onto the user row.
+    Only the profile attributes declared on UserProfileFields can be changed; any other
+    key is rejected by the schema.
     """
-    for field, value in payload.fields.items():
+    for field, value in payload.fields.dict(exclude_unset=True).items():
         setattr(user, field, value)
     session.commit()
     return _to_out(user)
