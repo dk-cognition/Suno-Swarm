@@ -1,7 +1,7 @@
 """Operational endpoints used by the internal operations dashboard."""
 import logging
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -18,7 +18,7 @@ log = logging.getLogger("swarm.admin")
 @router.get("/users")
 def list_users(
     email_like: str = "",
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=1000),
     session: Session = Depends(get_session),
 ) -> list[dict]:
     """List users, optionally filtered by an email substring."""
@@ -26,10 +26,12 @@ def list_users(
         "SELECT id, email, display_name, is_admin, is_active, workspace_id, created_at "
         "FROM users "
     )
+    params: dict = {"limit": limit}
     if email_like:
-        query += f"WHERE email LIKE '%{email_like}%' "
-    query += f"ORDER BY created_at DESC LIMIT {limit}"
-    rows = session.execute(text(query)).fetchall()
+        query += "WHERE email LIKE :email_like "
+        params["email_like"] = f"%{email_like}%"
+    query += "ORDER BY created_at DESC LIMIT :limit"
+    rows = session.execute(text(query), params).fetchall()
     return [dict(row._mapping) for row in rows]
 
 
