@@ -18,7 +18,21 @@ jobs:
       - name: Unit tests
         working-directory: services/api
         run: |
-          pip install pytest
+          pip install \
+            pytest \
+            fastapi==0.68.1 \
+            SQLAlchemy==1.4.23 \
+            psycopg2-binary==2.9.9 \
+            pydantic==1.10.15 \
+            PyJWT==1.7.1 \
+            celery==5.5.3 \
+            redis==3.5.3 \
+            PyYAML==6.0.2 \
+            lxml==4.9.4 \
+            python-multipart==0.0.5 \
+            boto3==1.18.40 \
+            requests==2.25.1 \
+            httpx==0.24.1
           pytest -q
 
   share-service:
