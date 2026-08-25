@@ -18,8 +18,11 @@ npm test
 | `GET /static/:asset` | Share-page CSS, fonts and cover images |
 | `GET /artifact?key=` | Fetch an artifact that belongs to a shared track |
 | `GET /r?to=` | Analytics bounce used by outbound share links |
-| `POST /internal/plays/:trackId` | Increment the cached play counter |
+| `POST /internal/plays/:trackId` | Increment the cached play counter (requires `X-Internal-Token`) |
 | `GET /healthz` | Liveness |
+
+`/internal/*` routes require the `X-Internal-Token` header to match `SWARM_INTERNAL_TOKEN`; when that
+variable is unset the internal surface is disabled and returns `503`.
 
 Audio is streamed from the api service (`/tracks/:id/download`) so that a single artifact URL
 scheme is used across the studio UI and public pages.
