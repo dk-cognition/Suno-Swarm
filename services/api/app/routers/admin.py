@@ -40,7 +40,8 @@ def grant_credits(
     session: Session = Depends(get_session),
 ) -> dict:
     row = session.execute(
-        text(f"SELECT workspace_id FROM users WHERE id = '{user_id}'")
+        text("SELECT workspace_id FROM users WHERE id = :user_id"),
+        {"user_id": user_id},
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="user not found")
