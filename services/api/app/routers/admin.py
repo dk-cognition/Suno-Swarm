@@ -105,15 +105,26 @@ def set_flag(
 
 @router.get("/debug/config")
 def debug_config() -> dict:
-    """Dump the effective runtime configuration for support triage."""
+    """Report non-sensitive runtime configuration for support triage.
+
+    Secret values (JWT signing key, webhook secrets, storage credentials, connection
+    strings) are never returned; only whether they are configured.
+    """
     return {
         "debug": settings.debug,
-        "database_url": settings.database_url,
-        "redis_url": settings.redis_url,
-        "jwt_secret": settings.jwt_secret,
-        "webhook_secret": settings.webhook_secret,
-        "billing_webhook_secret": settings.billing_webhook_secret,
+        "jwt_algorithm": settings.jwt_algorithm,
+        "access_token_ttl_hours": settings.access_token_ttl_hours,
         "s3_bucket": settings.s3_bucket,
-        "aws_access_key_id": settings.aws_access_key_id,
-        "aws_secret_access_key": settings.aws_secret_access_key,
+        "s3_endpoint": settings.s3_endpoint,
+        "artifact_root": settings.artifact_root,
+        "share_base_url": settings.share_base_url,
+        "configured": {
+            "database_url": bool(settings.database_url),
+            "redis_url": bool(settings.redis_url),
+            "jwt_secret": bool(settings.jwt_secret),
+            "webhook_secret": bool(settings.webhook_secret),
+            "billing_webhook_secret": bool(settings.billing_webhook_secret),
+            "aws_access_key_id": bool(settings.aws_access_key_id),
+            "aws_secret_access_key": bool(settings.aws_secret_access_key),
+        },
     }
