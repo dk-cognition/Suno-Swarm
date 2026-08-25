@@ -83,7 +83,7 @@ POST /prompts
 | `GET` | `/admin/jobs` | Job queue overview. |
 | `POST` | `/admin/jobs/{job_id}/requeue` | Requeue a failed job. |
 | `POST` | `/admin/flags` | Set a feature flag. |
-| `GET` | `/admin/debug/config` | Effective runtime configuration. |
+| `GET` | `/admin/debug/config` | Non-sensitive runtime configuration; secrets are reported only as configured/unconfigured booleans. |
 
 ## Webhooks — `/webhooks`
 
