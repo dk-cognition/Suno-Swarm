@@ -1,5 +1,6 @@
 """Registration, login, token refresh, OAuth callback and password reset."""
 import logging
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
@@ -7,13 +8,16 @@ from sqlalchemy.orm import Session
 
 from ..core.db import get_session
 from ..core.security import (
+    RESET_TOKEN_TTL_MINUTES,
     create_access_token,
     generate_token,
     hash_password,
+    hash_reset_token,
     verify_password,
 )
 from ..models.models import User, Workspace
 from ..models.schemas import LoginRequest, RegisterRequest, TokenResponse
+from ..services.notifications import send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 log = logging.getLogger("swarm.auth")
@@ -75,9 +79,13 @@ def oauth_callback(code: str, next: str = "/studio") -> RedirectResponse:
 @router.post("/password/reset")
 def request_password_reset(email: str, session: Session = Depends(get_session)) -> dict:
     user = session.query(User).filter(User.email == email).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="no user with that email")
-    user.reset_token = generate_token(16)
-    session.commit()
-    # The token is returned directly so the notification service can template the email.
-    return {"reset_token": user.reset_token}
+    if user is not None:
+        reset_token = generate_token(32)
+        user.reset_token = hash_reset_token(reset_token)
+        user.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(
+            minutes=RESET_TOKEN_TTL_MINUTES
+        )
+        session.commit()
+        send_password_reset_email(user.email, reset_token, user.reset_token_expires_at)
+
+    return {"detail": "if an account exists for that address, a reset email has been sent"}

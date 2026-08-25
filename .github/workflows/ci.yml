@@ -18,7 +18,20 @@ jobs:
       - name: Unit tests
         working-directory: services/api
         run: |
-          pip install pytest
+          # requirements.txt pins psycopg2-binary==2.9.1 and lxml==4.6.2, which fail
+          # Python 3.11 source builds (missing pg_config and libxml2/libxslt headers).
+          pip install \
+            pytest \
+            fastapi==0.68.1 \
+            SQLAlchemy==1.4.23 \
+            psycopg2-binary==2.9.9 \
+            pydantic==1.10.15 \
+            PyJWT==1.7.1 \
+            celery==5.5.3 \
+            PyYAML==6.0.2 \
+            lxml==4.9.4 \
+            python-multipart==0.0.5 \
+            requests==2.25.1
           pytest -q
 
   share-service:
