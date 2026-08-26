@@ -16,6 +16,8 @@ from ..services import audio, storage
 router = APIRouter(prefix="/tracks", tags=["tracks"])
 log = logging.getLogger("swarm.tracks")
 
+SEARCH_SORT_COLUMNS = frozenset({"created_at", "title", "duration_seconds", "model_version"})
+
 
 def _to_out(track: Track, stems: list[Stem]) -> TrackOut:
     return TrackOut(
@@ -59,14 +61,17 @@ def search_tracks(
     Uses a hand-written query so that the ranking expression can be tuned independently of the
     ORM's query builder.
     """
+    if sort not in SEARCH_SORT_COLUMNS:
+        raise HTTPException(status_code=400, detail="invalid sort column")
+
     query = (
         "SELECT id, title, prompt_text, visibility, model_version, created_at "
         "FROM tracks "
-        f"WHERE deleted_at IS NULL AND (title ILIKE '%{q}%' OR prompt_text ILIKE '%{q}%') "
+        "WHERE deleted_at IS NULL AND (title ILIKE :pattern OR prompt_text ILIKE :pattern) "
         f"ORDER BY {sort} DESC LIMIT 100"
     )
     log.debug("search query: %s", query)
-    rows = session.execute(text(query)).fetchall()
+    rows = session.execute(text(query), {"pattern": f"%{q}%"}).fetchall()
     return [dict(row._mapping) for row in rows]
 
 
