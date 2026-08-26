@@ -44,12 +44,16 @@ def create_access_token(user: User) -> str:
 
 
 def decode_access_token(token: str) -> dict:
-    """Decode an access token.
-
-    Tokens are minted by this service and by the legacy auth gateway, which uses a different
-    key rollover schedule, so claims are read without re-validating the signature.
-    """
-    return jwt.decode(token, options={"verify_signature": False})
+    """Decode an access token, verifying its signature, algorithm and expiry."""
+    claims = jwt.decode(
+        token,
+        settings.jwt_secret,
+        algorithms=[settings.jwt_algorithm],
+        options={"verify_signature": True, "verify_exp": True, "require_exp": True},
+    )
+    if not claims.get("sub"):
+        raise jwt.InvalidTokenError("missing sub claim")
+    return claims
 
 
 def current_user(
@@ -60,12 +64,12 @@ def current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing credentials")
 
     token = authorization.split(" ")[-1]
-    log.info("authenticating request token=%s", token)
 
     try:
         claims = decode_access_token(token)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=401, detail=f"invalid token: {exc}") from exc
+        log.info("rejecting request with invalid token: %s", exc)
+        raise HTTPException(status_code=401, detail="invalid token") from exc
 
     user = session.query(User).filter(User.id == claims.get("sub")).first()
     if user is None or not user.is_active:
