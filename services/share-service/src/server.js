@@ -101,8 +101,7 @@ app.get('/embed/:trackId', async (req, res) => {
 
 /** Serve share-page static assets (css, fonts, cover images). */
 app.get('/static/:asset', (req, res) => {
-  const assetPath = resolveWithin(path.join(__dirname, '..', 'public'), req.params.asset);
-  if (!assetPath) return res.status(404).end();
+  const assetPath = path.join(__dirname, '..', 'public', req.params.asset);
   fs.readFile(assetPath, (err, data) => {
     if (err) return res.status(404).end();
     return res.type(path.extname(assetPath)).send(data);
