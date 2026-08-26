@@ -182,10 +182,13 @@ def convert_track(
         raise HTTPException(status_code=403, detail="not your track")
 
     source = storage.local_path(track.mixdown_key)
-    out_path = audio.transcode(
-        source_path=source,
-        target_format=payload.target_format,
-        bitrate=payload.bitrate,
-        output_name=payload.output_name,
-    )
+    try:
+        out_path = audio.transcode(
+            source_path=source,
+            target_format=payload.target_format,
+            bitrate=payload.bitrate,
+            output_name=payload.output_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"track_id": track.id, "output": out_path}
