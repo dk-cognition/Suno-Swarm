@@ -26,7 +26,10 @@ spec:
             - name: SWARM_API_BASE_URL
               value: http://api.swarm.svc.cluster.local
             - name: SWARM_WEBHOOK_SECRET
-              value: whsec_9f2b17c4e58a4d0fa1c3
+              valueFrom:
+                secretKeyRef:
+                  name: swarm-webhook
+                  key: SWARM_WEBHOOK_SECRET
             - name: SWARM_MODEL_DIR
               value: /var/cache/swarm/models
           securityContext:
