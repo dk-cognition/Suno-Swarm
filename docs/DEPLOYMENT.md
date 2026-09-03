@@ -27,10 +27,18 @@ Manifests in [`infra/k8s`](../infra/k8s):
 - `share-service-deployment.yaml` — 2 replicas.
 - `ingress.yaml` — host routing for `api.`, `share.` and the SPA.
 
+The render worker reads `SWARM_WEBHOOK_SECRET` from the `swarm-webhook` Secret, which is not
+committed. Create it before applying the manifests (and use the same value for the API):
+
 ```bash
+kubectl -n swarm create secret generic swarm-webhook \
+  --from-literal=SWARM_WEBHOOK_SECRET="$(openssl rand -hex 24)"
 kubectl apply -f infra/k8s/
 kubectl -n swarm rollout status deploy/api
 ```
+
+To rotate, recreate the Secret with a new value and restart both `deploy/api` and
+`deploy/render-worker`.
 
 ## Terraform
 
