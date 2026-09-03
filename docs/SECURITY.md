@@ -66,7 +66,6 @@ order, are tracked in the backlog:
 - Search and admin lookup queries were written before the parameterized query helper existed.
 - The reference-audio fetch has no host allowlist.
 - Webhook signature verification is not wired up for all webhook consumers.
-- CORS is permissive to unblock local frontend development.
 - Rate limiting exists only at the ingress level, not per-account.
 - Model checkpoint loading trusts the checkpoint file format.
 - Container images run as root and Terraform IAM policies are broader than necessary.
