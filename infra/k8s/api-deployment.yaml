@@ -12,13 +12,21 @@ data:
   SWARM_DEBUG: "1"
   SWARM_S3_BUCKET: suno-swarm-artifacts
   SWARM_SHARE_BASE_URL: https://share.suno-swarm.example
-  SWARM_JWT_SECRET: swarm-dev-secret-2024
-  SWARM_WEBHOOK_SECRET: whsec_9f2b17c4e58a4d0fa1c3
-  SWARM_BILLING_WEBHOOK_SECRET: whsec_billing_5c1d90ab77e2
-  SWARM_DATABASE_URL: postgresql://swarm:SwarmStaging2024!@swarm-staging.rds.amazonaws.com:5432/swarm
-  AWS_ACCESS_KEY_ID: AKIA3XJ7QK2LMNOPQR4S
-  AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 ---
+# Sensitive values live in the `api-secrets` Secret, which is provisioned out of
+# band (e.g. External Secrets Operator syncing from AWS Secrets Manager) and is
+# never committed. Required keys:
+#   SWARM_JWT_SECRET, SWARM_WEBHOOK_SECRET, SWARM_BILLING_WEBHOOK_SECRET,
+#   SWARM_DATABASE_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+#
+# Example (values redacted):
+#   kubectl -n swarm create secret generic api-secrets \
+#     --from-literal=SWARM_JWT_SECRET=... \
+#     --from-literal=SWARM_WEBHOOK_SECRET=... \
+#     --from-literal=SWARM_BILLING_WEBHOOK_SECRET=... \
+#     --from-literal=SWARM_DATABASE_URL=... \
+#     --from-literal=AWS_ACCESS_KEY_ID=... \
+#     --from-literal=AWS_SECRET_ACCESS_KEY=...
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -43,6 +51,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: api-config
+            - secretRef:
+                name: api-secrets
           securityContext:
             runAsUser: 0
             allowPrivilegeEscalation: true
