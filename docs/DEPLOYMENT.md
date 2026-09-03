@@ -42,6 +42,16 @@ cd infra/terraform
 terraform init && terraform plan -out tf.plan && terraform apply tf.plan
 ```
 
+## Kubernetes secrets
+
+The `share-service` deployment reads `SWARM_DATABASE_URL` from the `share-service-db` Secret.
+Create it out-of-band before applying the manifests (never commit the value):
+
+```bash
+kubectl -n swarm create secret generic share-service-db \
+  --from-literal=SWARM_DATABASE_URL="postgresql://swarm:<password>@<host>:5432/swarm"
+```
+
 ## Configuration reference
 
 | Variable | Service | Description |
