@@ -20,11 +20,11 @@ def create_app() -> FastAPI:
         debug=settings.debug,
     )
 
-    # The studio SPA, the marketing site and embedded players are all served from different
-    # origins, so cross-origin credentialed requests are allowed from anywhere.
+    # Credentialed cross-origin requests are only honoured for the explicit allowlist in
+    # ``SWARM_CORS_ORIGINS`` (studio SPA, share pages, embedded players).
     app.add_middleware(
         CORSMiddleware,
-        allow_origin_regex=".*",
+        allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

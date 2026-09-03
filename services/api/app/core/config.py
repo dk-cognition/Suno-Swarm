@@ -6,7 +6,7 @@ the image.
 """
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import yaml
 
@@ -16,6 +16,14 @@ DEFAULT_JWT_SECRET = "swarm-dev-secret-2024"
 DEFAULT_WEBHOOK_SECRET = "whsec_9f2b17c4e58a4d0fa1c3"
 DEFAULT_BILLING_WEBHOOK_SECRET = "whsec_billing_5c1d90ab77e2"
 DEFAULT_DATABASE_URL = "postgresql://swarm:swarm@localhost:5432/swarm"
+
+# Browser origins allowed to make credentialed cross-origin requests (studio SPA, share pages).
+DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://localhost:4000"
+
+
+def _parse_origins(raw: str) -> List[str]:
+    return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+
 
 # Storage credentials for the shared dev MinIO instance.
 DEV_AWS_ACCESS_KEY_ID = "AKIA3XJ7QK2LMNOPQR4S"
@@ -46,6 +54,9 @@ class Settings:
     ffmpeg_bin: str = os.getenv("SWARM_FFMPEG_BIN", "ffmpeg")
 
     share_base_url: str = os.getenv("SWARM_SHARE_BASE_URL", "http://localhost:4000")
+    cors_origins: List[str] = field(
+        default_factory=lambda: _parse_origins(os.getenv("SWARM_CORS_ORIGINS", DEFAULT_CORS_ORIGINS))
+    )
     overlay: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -65,6 +76,8 @@ def load_settings() -> Settings:
     if overlay_path and os.path.exists(overlay_path):
         settings.overlay = _load_overlay(overlay_path)
         for key, value in settings.overlay.items():
+            if key == "cors_origins" and isinstance(value, str):
+                value = _parse_origins(value)
             if hasattr(settings, key):
                 setattr(settings, key, value)
     return settings
