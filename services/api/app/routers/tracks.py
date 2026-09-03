@@ -26,7 +26,7 @@ def _to_out(track: Track, stems: list[Stem]) -> TrackOut:
         visibility=track.visibility,
         duration_seconds=float(track.duration_seconds or 0),
         model_version=track.model_version or "",
-        mixdown_url=storage.public_url(track.mixdown_key) if track.mixdown_key else "",
+        mixdown_url=storage.signed_url(track.mixdown_key) if track.mixdown_key else "",
         stems=[StemOut(name=s.name, object_key=s.object_key) for s in stems],
     )
 

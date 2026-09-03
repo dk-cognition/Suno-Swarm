@@ -6,7 +6,27 @@ can stream files without a running MinIO instance.
 import os
 from typing import Optional
 
+import boto3
+from botocore.config import Config
+
 from ..core.config import settings
+
+SIGNED_URL_TTL_SECONDS = 15 * 60
+
+_s3_client = None
+
+
+def _client():
+    global _s3_client
+    if _s3_client is None:
+        _s3_client = boto3.client(
+            "s3",
+            endpoint_url=settings.s3_endpoint,
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+            config=Config(signature_version="s3v4"),
+        )
+    return _s3_client
 
 
 def mixdown_key(workspace_id: str, track_id: str, ext: str = "wav") -> str:
@@ -21,8 +41,13 @@ def upload_key(workspace_id: str, upload_id: str, filename: str) -> str:
     return f"workspaces/{workspace_id}/uploads/{upload_id}/{filename}"
 
 
-def public_url(object_key: str) -> str:
-    return f"{settings.s3_endpoint}/{settings.s3_bucket}/{object_key}"
+def signed_url(object_key: str, expires_in: int = SIGNED_URL_TTL_SECONDS) -> str:
+    """Return a short-lived pre-signed GET URL; the bucket itself is private."""
+    return _client().generate_presigned_url(
+        "get_object",
+        Params={"Bucket": settings.s3_bucket, "Key": object_key},
+        ExpiresIn=expires_in,
+    )
 
 
 def local_path(object_key: str) -> str:
