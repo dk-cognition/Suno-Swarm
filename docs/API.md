@@ -60,8 +60,8 @@ POST /prompts
 | `GET` | `/tracks/{track_id}` | Track metadata + signed artifact URLs. |
 | `PATCH` | `/tracks/{track_id}` | Rename / retag / toggle visibility. |
 | `DELETE` | `/tracks/{track_id}` | Soft delete. |
-| `GET` | `/tracks/{track_id}/download` | Download the mixdown. |
-| `GET` | `/tracks/{track_id}/stems/{name}` | Download a single stem file. |
+| `GET` | `/tracks/{track_id}/download` | Download the mixdown. Public tracks are open; private tracks require credentials (`Authorization` header or `?token=`) from the owning workspace. |
+| `GET` | `/tracks/{track_id}/stems/{name}` | Download a single stem file. Same access rules as `/download`. |
 | `POST` | `/tracks/{track_id}/convert` | Transcode to another container/codec. |
 
 ## Playlists — `/playlists`

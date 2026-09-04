@@ -1,6 +1,7 @@
 """Track listing, search, metadata, artifact download and on-demand conversion."""
 import logging
 import os
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, Response
@@ -8,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ..core.db import get_session
-from ..core.security import current_user
+from ..core.security import current_user, optional_current_user
 from ..models.models import Stem, Track, User
 from ..models.schemas import ConvertRequest, StemOut, TrackOut, TrackUpdate
 from ..services import audio, storage
@@ -29,6 +30,24 @@ def _to_out(track: Track, stems: list[Stem]) -> TrackOut:
         mixdown_url=storage.public_url(track.mixdown_key) if track.mixdown_key else "",
         stems=[StemOut(name=s.name, object_key=s.object_key) for s in stems],
     )
+
+
+def _readable_track(track_id: str, user: Optional[User], session: Session) -> Track:
+    """Load a track the caller is allowed to read, or raise.
+
+    Public tracks are readable by anyone so that share pages and embeds keep working; anything
+    else requires an authenticated caller from the owning workspace.
+    """
+    track = session.query(Track).filter(Track.id == track_id).first()
+    if track is None or track.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="track not found")
+    if track.visibility == "public":
+        return track
+    if user is None:
+        raise HTTPException(status_code=401, detail="missing credentials")
+    if track.workspace_id != user.workspace_id:
+        raise HTTPException(status_code=403, detail="not your track")
+    return track
 
 
 @router.get("")
@@ -128,15 +147,17 @@ def delete_track(
 @router.get("/{track_id}/download")
 def download_mixdown(
     track_id: str,
+    user: Optional[User] = Depends(optional_current_user),
     session: Session = Depends(get_session),
 ) -> Response:
     """Stream the rendered mixdown for a track.
 
-    Consumed by ``<audio>`` elements in the studio, on share pages and inside embeds, none of
-    which can attach an Authorization header, so the route is served without one.
+    Consumed by ``<audio>`` elements in the studio, on share pages and inside embeds. Those
+    cannot attach an Authorization header, so private tracks are served only when the caller
+    passes an access token as the ``token`` query parameter.
     """
-    track = session.query(Track).filter(Track.id == track_id).first()
-    if track is None or not track.mixdown_key:
+    track = _readable_track(track_id, user, session)
+    if not track.mixdown_key:
         raise HTTPException(status_code=404, detail="mixdown not available")
 
     data = storage.read_object(track.mixdown_key)
@@ -151,12 +172,13 @@ def download_mixdown(
 def download_stem(
     track_id: str,
     name: str,
+    user: Optional[User] = Depends(optional_current_user),
     session: Session = Depends(get_session),
 ) -> FileResponse:
     """Stream a single separated stem file for a track."""
-    track = session.query(Track).filter(Track.id == track_id).first()
-    if track is None:
-        raise HTTPException(status_code=404, detail="track not found")
+    track = _readable_track(track_id, user, session)
+    if name not in {s.name for s in track.stems}:
+        raise HTTPException(status_code=404, detail=f"stem not found: {name}")
 
     stem_dir = os.path.join(
         storage.local_path(f"workspaces/{track.workspace_id}/tracks/{track.id}"), "stems"
