@@ -38,5 +38,6 @@ export const api = {
   track: (id) => request(`/tracks/${id}`),
   renameTrack: (id, title) =>
     request(`/tracks/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) }),
-  downloadUrl: (id) => `${API_BASE}/tracks/${id}/download`,
+  downloadUrl: (id) =>
+    `${API_BASE}/tracks/${id}/download?token=${encodeURIComponent(getToken())}`,
 };

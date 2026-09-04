@@ -73,6 +73,23 @@ def current_user(
     return user
 
 
+def optional_current_user(
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = None,
+    session: Session = Depends(get_session),
+) -> Optional[User]:
+    """Resolve the caller when credentials are present, otherwise return ``None``.
+
+    Media elements (``<audio>``, embeds) cannot attach an Authorization header, so a ``token``
+    query parameter is accepted as well. Routes using this dependency must still authorize the
+    resolved user themselves.
+    """
+    credentials = authorization or (f"Bearer {token}" if token else None)
+    if not credentials:
+        return None
+    return current_user(authorization=credentials, session=session)
+
+
 def require_admin(
     x_admin: Optional[str] = Header(None),
     user: Optional[User] = Depends(current_user),
