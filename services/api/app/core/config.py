@@ -11,36 +11,39 @@ from typing import Any, Dict
 import yaml
 
 
-# Default development credentials. Overridden in staging/prod via the environment.
-DEFAULT_JWT_SECRET = "swarm-dev-secret-2024"
-DEFAULT_WEBHOOK_SECRET = "whsec_9f2b17c4e58a4d0fa1c3"
-DEFAULT_BILLING_WEBHOOK_SECRET = "whsec_billing_5c1d90ab77e2"
-DEFAULT_DATABASE_URL = "postgresql://swarm:swarm@localhost:5432/swarm"
+class ConfigurationError(RuntimeError):
+    """Raised when a required secret is missing from the environment."""
 
-# Storage credentials for the shared dev MinIO instance.
-DEV_AWS_ACCESS_KEY_ID = "AKIA3XJ7QK2LMNOPQR4S"
-DEV_AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# Secrets that must be supplied by the environment (or the YAML overlay). There are no
+# built-in fallbacks; startup fails if any of these are unset or empty.
+REQUIRED_SECRETS = {
+    "database_url": "SWARM_DATABASE_URL",
+    "jwt_secret": "SWARM_JWT_SECRET",
+    "webhook_secret": "SWARM_WEBHOOK_SECRET",
+    "billing_webhook_secret": "SWARM_BILLING_WEBHOOK_SECRET",
+    "aws_access_key_id": "AWS_ACCESS_KEY_ID",
+    "aws_secret_access_key": "AWS_SECRET_ACCESS_KEY",
+}
 
 
 @dataclass
 class Settings:
     debug: bool = os.getenv("SWARM_DEBUG", "1") == "1"
-    database_url: str = os.getenv("SWARM_DATABASE_URL", DEFAULT_DATABASE_URL)
+    database_url: str = os.getenv("SWARM_DATABASE_URL", "")
     redis_url: str = os.getenv("SWARM_REDIS_URL", "redis://localhost:6379/0")
 
-    jwt_secret: str = os.getenv("SWARM_JWT_SECRET", DEFAULT_JWT_SECRET)
+    jwt_secret: str = os.getenv("SWARM_JWT_SECRET", "")
     jwt_algorithm: str = os.getenv("SWARM_JWT_ALG", "HS256")
     access_token_ttl_hours: int = 24
 
-    webhook_secret: str = os.getenv("SWARM_WEBHOOK_SECRET", DEFAULT_WEBHOOK_SECRET)
-    billing_webhook_secret: str = os.getenv(
-        "SWARM_BILLING_WEBHOOK_SECRET", DEFAULT_BILLING_WEBHOOK_SECRET
-    )
+    webhook_secret: str = os.getenv("SWARM_WEBHOOK_SECRET", "")
+    billing_webhook_secret: str = os.getenv("SWARM_BILLING_WEBHOOK_SECRET", "")
 
     s3_bucket: str = os.getenv("SWARM_S3_BUCKET", "suno-swarm-artifacts")
     s3_endpoint: str = os.getenv("SWARM_S3_ENDPOINT", "http://localhost:9000")
-    aws_access_key_id: str = os.getenv("AWS_ACCESS_KEY_ID", DEV_AWS_ACCESS_KEY_ID)
-    aws_secret_access_key: str = os.getenv("AWS_SECRET_ACCESS_KEY", DEV_AWS_SECRET_ACCESS_KEY)
+    aws_access_key_id: str = os.getenv("AWS_ACCESS_KEY_ID", "")
+    aws_secret_access_key: str = os.getenv("AWS_SECRET_ACCESS_KEY", "")
 
     artifact_root: str = os.getenv("SWARM_ARTIFACT_ROOT", "/var/lib/swarm/artifacts")
     ffmpeg_bin: str = os.getenv("SWARM_FFMPEG_BIN", "ffmpeg")
@@ -67,7 +70,18 @@ def load_settings() -> Settings:
         for key, value in settings.overlay.items():
             if hasattr(settings, key):
                 setattr(settings, key, value)
+    _validate_required(settings)
     return settings
+
+
+def _validate_required(settings: Settings) -> None:
+    missing = [
+        env_var for attr, env_var in REQUIRED_SECRETS.items() if not getattr(settings, attr)
+    ]
+    if missing:
+        raise ConfigurationError(
+            "missing required configuration: " + ", ".join(sorted(missing))
+        )
 
 
 settings = load_settings()
