@@ -15,9 +15,10 @@ log = logging.getLogger("swarm.worker")
 
 celery_app = Celery("swarm", broker=worker_settings.redis_url, backend=worker_settings.redis_url)
 celery_app.conf.update(
-    task_serializer="pickle",
-    result_serializer="pickle",
-    accept_content=["pickle", "json"],
+    task_serializer="json",
+    result_serializer="json",
+    accept_content=["json"],
+    result_accept_content=["json"],
     task_acks_late=True,
 )
 
