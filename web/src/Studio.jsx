@@ -100,7 +100,9 @@ export default function Studio() {
       {results.length > 0 && (
         <ul className="results">
           {results.map((r) => (
-            <li key={r.id} dangerouslySetInnerHTML={{ __html: `<strong>${r.title}</strong> — ${r.prompt_text || ''}` }} />
+            <li key={r.id}>
+              <strong>{r.title}</strong> — {r.prompt_text || ''}
+            </li>
           ))}
         </ul>
       )}
