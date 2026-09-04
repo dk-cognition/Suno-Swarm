@@ -31,8 +31,9 @@ async def render_callback(
     """Consume a completion callback from the render worker."""
     body = await request.body()
     expected = _sign(body, settings.webhook_secret)
-    if x_swarm_signature and x_swarm_signature != expected:
-        log.warning("render callback signature mismatch job_id=%s", payload.job_id)
+    if not x_swarm_signature or not hmac.compare_digest(x_swarm_signature, expected):
+        log.warning("render callback signature rejected job_id=%s", payload.job_id)
+        raise HTTPException(status_code=401, detail="invalid webhook signature")
 
     job = session.query(RenderJob).filter(RenderJob.id == payload.job_id).first()
     if job is None:
@@ -55,7 +56,7 @@ async def render_callback(
 
     prompt = session.query(Prompt).filter(Prompt.id == job.prompt_id).first()
     track = Track(
-        workspace_id=payload.workspace_id or job.workspace_id,
+        workspace_id=job.workspace_id,
         job_id=job.id,
         title=payload.title or (prompt.text[:60] if prompt else "Untitled"),
         prompt_text=prompt.text if prompt else "",
