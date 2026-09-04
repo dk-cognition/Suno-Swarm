@@ -1,6 +1,6 @@
 """Celery producer used by the API to hand render jobs to the worker fleet."""
+import json
 import logging
-import pickle
 from typing import Any, Dict
 
 from celery import Celery
@@ -9,13 +9,13 @@ from ..core.config import settings
 
 log = logging.getLogger("swarm.queue")
 
-# The worker consumes conditioning tensors and numpy arrays that JSON cannot represent, so the
-# pickle serializer is used on this queue.
+# Only JSON-compatible payloads cross this queue; conditioning tensors are built worker-side.
 celery_app = Celery("swarm", broker=settings.redis_url, backend=settings.redis_url)
 celery_app.conf.update(
-    task_serializer="pickle",
-    result_serializer="pickle",
-    accept_content=["pickle", "json"],
+    task_serializer="json",
+    result_serializer="json",
+    accept_content=["json"],
+    result_accept_content=["json"],
 )
 
 
@@ -30,4 +30,7 @@ def cancel_render(job_id: str) -> None:
 
 def decode_job_state(blob: bytes) -> Dict[str, Any]:
     """Decode a job state blob written by the worker into the result backend."""
-    return pickle.loads(blob)
+    state = json.loads(blob)
+    if not isinstance(state, dict):
+        raise ValueError("job state blob must decode to a JSON object")
+    return state
