@@ -20,14 +20,36 @@ const pool = new Pool({
 const ARTIFACT_ROOT = process.env.SWARM_ARTIFACT_ROOT || '/var/lib/swarm/artifacts';
 const API_BASE = process.env.SWARM_API_BASE_URL || 'http://localhost:8000';
 
+const CSP =
+  "default-src 'none'; style-src 'self'; img-src 'self' data:; media-src 'self' " +
+  API_BASE +
+  "; frame-ancestors *; base-uri 'none'; form-action 'none'";
+
+/** HTML-escape a value for safe interpolation into text content or attribute values. */
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+app.use((_req, res, next) => {
+  res.setHeader('Content-Security-Policy', CSP);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
+
 function page(title, body) {
+  const safeTitle = escapeHtml(title);
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${title} · Suno-Swarm</title>
-  <meta property="og:title" content="${title}" />
+  <title>${safeTitle} · Suno-Swarm</title>
+  <meta property="og:title" content="${safeTitle}" />
   <meta property="og:site_name" content="Suno-Swarm" />
   <link rel="stylesheet" href="/static/share.css" />
 </head>
@@ -61,14 +83,14 @@ app.get('/s/:slug', async (req, res) => {
   const t = track.rows[0];
   const body = `
     <article class="track">
-      <h1>${t.title}</h1>
-      <p class="prompt">${t.prompt_text || ''}</p>
+      <h1>${escapeHtml(t.title)}</h1>
+      <p class="prompt">${escapeHtml(t.prompt_text)}</p>
       <dl>
-        <dt>Model</dt><dd>${t.model_version || 'unknown'}</dd>
-        <dt>Duration</dt><dd>${t.duration_seconds}s</dd>
+        <dt>Model</dt><dd>${escapeHtml(t.model_version || 'unknown')}</dd>
+        <dt>Duration</dt><dd>${escapeHtml(t.duration_seconds)}s</dd>
       </dl>
-      <audio controls src="${API_BASE}/tracks/${t.id}/download"></audio>
-      <p class="embed">Embed: <code>&lt;iframe src="/embed/${t.id}"&gt;&lt;/iframe&gt;</code></p>
+      <audio controls src="${escapeHtml(API_BASE)}/tracks/${encodeURIComponent(t.id)}/download"></audio>
+      <p class="embed">Embed: <code>&lt;iframe src="/embed/${encodeURIComponent(t.id)}"&gt;&lt;/iframe&gt;</code></p>
     </article>`;
   return res.send(page(t.title, body));
 });
@@ -81,8 +103,8 @@ app.get('/embed/:trackId', async (req, res) => {
   if (result.rowCount === 0) return res.status(404).end();
   const t = result.rows[0];
   res.send(`<!doctype html><html><body class="embed">
-    <div class="embed-title">${t.title}</div>
-    <audio controls autoplay src="${API_BASE}/tracks/${t.id}/download"></audio>
+    <div class="embed-title">${escapeHtml(t.title)}</div>
+    <audio controls autoplay src="${escapeHtml(API_BASE)}/tracks/${encodeURIComponent(t.id)}/download"></audio>
   </body></html>`);
 });
 
@@ -125,4 +147,4 @@ if (require.main === module) {
   app.listen(port, () => console.log(`share-service listening on ${port}`));
 }
 
-module.exports = { app, page };
+module.exports = { app, page, escapeHtml };
