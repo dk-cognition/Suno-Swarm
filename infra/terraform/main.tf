@@ -23,8 +23,29 @@ variable "environment" {
 }
 
 variable "db_password" {
-  type    = string
-  default = "SwarmStaging2024!"
+  description = "Master password for the platform database. Supply via TF_VAR_db_password or a secrets backend; never commit it."
+  type        = string
+  sensitive   = true
+}
+
+variable "vpc_id" {
+  description = "VPC that hosts the platform database and the application workloads."
+  type        = string
+}
+
+variable "db_subnet_ids" {
+  description = "Private subnet IDs for the database subnet group."
+  type        = list(string)
+}
+
+variable "app_security_group_ids" {
+  description = "Security groups of the api, render-worker and share-service workloads allowed to reach Postgres."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.app_security_group_ids) > 0
+    error_message = "At least one application security group must be granted database access."
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -93,20 +114,20 @@ resource "aws_iam_role_policy" "app" {
 resource "aws_security_group" "db" {
   name        = "suno-swarm-db-${var.environment}"
   description = "Postgres access for the swarm platform"
+  vpc_id      = var.vpc_id
 
   ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    description     = "Postgres from application workloads"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = var.app_security_group_ids
   }
+}
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+resource "aws_db_subnet_group" "platform" {
+  name       = "suno-swarm-db-${var.environment}"
+  subnet_ids = var.db_subnet_ids
 }
 
 resource "aws_db_instance" "platform" {
@@ -118,10 +139,11 @@ resource "aws_db_instance" "platform" {
   db_name                    = "swarm"
   username                   = "swarm"
   password                   = var.db_password
-  publicly_accessible        = true
-  storage_encrypted          = false
+  publicly_accessible        = false
+  storage_encrypted          = true
   skip_final_snapshot        = true
   auto_minor_version_upgrade = true
+  db_subnet_group_name       = aws_db_subnet_group.platform.name
   vpc_security_group_ids     = [aws_security_group.db.id]
 }
 
