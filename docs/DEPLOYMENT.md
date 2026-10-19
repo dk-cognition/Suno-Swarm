@@ -37,9 +37,19 @@ kubectl -n swarm rollout status deploy/api
 [`infra/terraform`](../infra/terraform) provisions the artifacts bucket, the app IAM role and the
 RDS instance.
 
+The database is private (`publicly_accessible = false`), encrypted at rest, placed in the
+`db_subnet_ids` subnet group, and only accepts 5432 from `app_security_group_ids`. The master
+password has no default and must come from the environment or a secrets backend:
+
 ```bash
 cd infra/terraform
-terraform init && terraform plan -out tf.plan && terraform apply tf.plan
+export TF_VAR_db_password=...   # from your secrets manager, never committed
+terraform init && terraform plan -out tf.plan \
+  -var vpc_id=vpc-... \
+  -var 'db_subnet_ids=["subnet-...","subnet-..."]' \
+  -var 'app_security_group_ids=["sg-..."]' \
+  && terraform apply tf.plan
+terraform test   # policy checks for the database lockdown
 ```
 
 ## Configuration reference
