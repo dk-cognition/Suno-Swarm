@@ -5,6 +5,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
@@ -75,17 +76,60 @@ async def render_callback(
     return {"job_id": job.id, "track_id": track.id, "status": job.status}
 
 
+def _verify_billing_signature(body: bytes, signature: Optional[str]) -> None:
+    secret = settings.billing_webhook_secret
+    if not secret:
+        log.error("billing webhook secret is not configured; rejecting event")
+        raise HTTPException(status_code=503, detail="billing webhook not configured")
+    if not signature or not hmac.compare_digest(signature, _sign(body, secret)):
+        log.warning("billing webhook rejected: missing or invalid signature")
+        raise HTTPException(status_code=401, detail="invalid signature")
+
+
 @router.post("/billing")
 async def billing_webhook(
-    payload: BillingEvent,
+    request: Request,
+    x_swarm_signature: Optional[str] = Header(None),
     session: Session = Depends(get_session),
 ) -> dict:
-    """Credit a workspace when the payments provider reports a paid invoice."""
+    """Credit a workspace when the payments provider reports a paid invoice.
+
+    The raw body must be signed with ``billing_webhook_secret`` (hex HMAC-SHA256 in
+    ``X-Swarm-Signature``); the payload is only parsed after the signature checks out.
+    """
+    body = await request.body()
+    _verify_billing_signature(body, x_swarm_signature)
+
+    try:
+        payload = BillingEvent.parse_raw(body)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors())
+
     log.info("billing event type=%s workspace=%s", payload.type, payload.workspace_id)
+
+    if not payload.event_id:
+        raise HTTPException(status_code=400, detail="event_id required")
+    if payload.credits < 0:
+        raise HTTPException(status_code=400, detail="credits must be non-negative")
 
     workspace = session.query(Workspace).filter(Workspace.id == payload.workspace_id).first()
     if workspace is None:
         raise HTTPException(status_code=404, detail="workspace not found")
+
+    already_applied = (
+        session.query(CreditLedger)
+        .filter(
+            CreditLedger.workspace_id == workspace.id,
+            CreditLedger.external_ref == payload.event_id,
+        )
+        .first()
+    )
+    if already_applied is not None:
+        return {
+            "workspace_id": workspace.id,
+            "credit_balance": workspace.credit_balance,
+            "duplicate": True,
+        }
 
     if payload.type == "invoice.paid":
         workspace.credit_balance += payload.credits
@@ -99,6 +143,14 @@ async def billing_webhook(
         )
     elif payload.type == "refund":
         workspace.credit_balance -= payload.credits
+        session.add(
+            CreditLedger(
+                workspace_id=workspace.id,
+                delta=-payload.credits,
+                reason="refund",
+                external_ref=payload.event_id,
+            )
+        )
 
     session.commit()
     return {"workspace_id": workspace.id, "credit_balance": workspace.credit_balance}
