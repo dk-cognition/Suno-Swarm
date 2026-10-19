@@ -92,6 +92,10 @@ POST /prompts
 | `POST` | `/webhooks/render` | Worker callback with rendered artifacts. |
 | `POST` | `/webhooks/billing` | Payment provider events (`invoice.paid`, `refund`). |
 
+`/webhooks/billing` requires `X-Swarm-Signature: <hex HMAC-SHA256 of the raw body>` keyed with
+`SWARM_BILLING_WEBHOOK_SECRET`. Missing or invalid signatures get `401` and nothing is applied.
+Every event needs a unique `event_id`; replays of an already-applied `event_id` are no-ops.
+
 ## Error envelope
 
 ```json
