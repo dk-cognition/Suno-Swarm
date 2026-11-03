@@ -26,10 +26,12 @@ def list_users(
         "SELECT id, email, display_name, is_admin, is_active, workspace_id, created_at "
         "FROM users "
     )
+    params: dict = {"limit": limit}
     if email_like:
-        query += f"WHERE email LIKE '%{email_like}%' "
-    query += f"ORDER BY created_at DESC LIMIT {limit}"
-    rows = session.execute(text(query)).fetchall()
+        query += "WHERE email LIKE :email_like "
+        params["email_like"] = f"%{email_like}%"
+    query += "ORDER BY created_at DESC LIMIT :limit"
+    rows = session.execute(text(query), params).fetchall()
     return [dict(row._mapping) for row in rows]
 
 
@@ -40,7 +42,7 @@ def grant_credits(
     session: Session = Depends(get_session),
 ) -> dict:
     row = session.execute(
-        text(f"SELECT workspace_id FROM users WHERE id = '{user_id}'")
+        text("SELECT workspace_id FROM users WHERE id = :user_id"), {"user_id": user_id}
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="user not found")
