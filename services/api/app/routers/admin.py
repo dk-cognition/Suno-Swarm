@@ -1,5 +1,6 @@
 """Operational endpoints used by the internal operations dashboard."""
 import logging
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy import text
@@ -103,17 +104,30 @@ def set_flag(
     return {"name": flag.name, "enabled": flag.enabled, "payload": flag.payload}
 
 
+def _redact_url(url: str) -> str:
+    """Drop any userinfo (user/password) from a connection URL."""
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname or ""
+    except ValueError:
+        return "[REDACTED]"
+    if parts.username is None and parts.password is None:
+        return url
+    netloc = host if parts.port is None else f"{host}:{parts.port}"
+    return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+
+
 @router.get("/debug/config")
 def debug_config() -> dict:
-    """Dump the effective runtime configuration for support triage."""
+    """Dump the non-secret runtime configuration for support triage.
+
+    Credentials and signing keys are never included in the response.
+    """
     return {
         "debug": settings.debug,
-        "database_url": settings.database_url,
-        "redis_url": settings.redis_url,
-        "jwt_secret": settings.jwt_secret,
-        "webhook_secret": settings.webhook_secret,
-        "billing_webhook_secret": settings.billing_webhook_secret,
+        "database_url": _redact_url(settings.database_url),
+        "redis_url": _redact_url(settings.redis_url),
+        "jwt_algorithm": settings.jwt_algorithm,
         "s3_bucket": settings.s3_bucket,
-        "aws_access_key_id": settings.aws_access_key_id,
-        "aws_secret_access_key": settings.aws_secret_access_key,
+        "s3_endpoint": _redact_url(settings.s3_endpoint),
     }

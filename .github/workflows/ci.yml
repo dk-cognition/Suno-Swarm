@@ -18,7 +18,8 @@ jobs:
       - name: Unit tests
         working-directory: services/api
         run: |
-          pip install pytest
+          pip install pytest "fastapi==0.68.1" "pydantic>=1.10,<2" "SQLAlchemy==1.4.23" \
+            "PyJWT==1.7.1" PyYAML requests celery redis
           pytest -q
 
   share-service:
