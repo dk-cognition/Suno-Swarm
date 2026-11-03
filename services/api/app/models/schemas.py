@@ -1,7 +1,9 @@
 """Pydantic request/response schemas."""
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
+
+from ..services import audio
 
 
 class RegisterRequest(BaseModel):
@@ -96,6 +98,10 @@ class ConvertRequest(BaseModel):
     target_format: str = "mp3"
     bitrate: str = "192k"
     output_name: str = "mixdown"
+
+    _check_target_format = validator("target_format", allow_reuse=True)(audio.check_target_format)
+    _check_bitrate = validator("bitrate", allow_reuse=True)(audio.check_bitrate)
+    _check_output_name = validator("output_name", allow_reuse=True)(audio.check_output_name)
 
 
 class PlaylistCreate(BaseModel):
